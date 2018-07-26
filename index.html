@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<!-- saved from url=(0050)./ -->
+<html lang="en">
+	<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="MegaCorp">
+    <link rel="icon" href=".\ComicDaemon.ico">
+
+    <title>Comic Daemon</title>
+
+    <!-- Bootstrap core CSS  use .min.css for actual deployment-->
+    <link href="./bootstrap/css/bootstrap.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+	<!-- Custom CSS -->
+    <link href="./starter-template.css" rel="stylesheet">
+    <link href="./simple-sidebar.css" rel="stylesheet">
+	
+	
+	<link href="Style.css" rel="stylesheet">
+	<script type="text/javascript" src="ComicDaemonSession.js" ></script>
+	<script type="text/javascript" src="helpers.js" ></script>
+	<script type="text/javascript" src="QueryString.js" ></script>
+
+  </head>
+
+  <body>
+
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+        <div class="navbar-header">
+          <a class="navbar-brand" href="#Comics" id="menu-toggle" onclick="ShowComicList();" >Comic Daemon</a>
+        </div>
+    </nav>
+	
+	<div id="wrapper">
+        <!-- Sidebar -->
+        <div id="sidebar-wrapper">
+            <ul id="comic_list" class="sidebar-nav">
+                <li class="sidebar-brand">
+					Comics
+                </li>
+				<!-- The Comics are dynamically loaded. Adding a comic is a data change. -->
+				<!-- 				
+				<li>
+                    <a onclick="LoadComic('test');" >Test</a>
+                </li> 
+				-->
+
+            </ul>
+        </div>
+	
+		<div class="container">
+		
+			<!-- Display: Comic Page -->
+			<div id="display_comic" class="starter-template" style="display:none;">
+				<h2 id="comic_title"> Template Comic Title</h2>
+				<!-- Latest Comics-->
+				<h6>Updated: <span id="comic_updatetime">Template Update Time</span></h6>
+				<br>
+				<table class="table table-hover">
+					<tbody id="comic_pages">
+					  <tr>
+						<td>0 <a href="pagelink" target="_blank">Page Title</a></td>
+					  </tr>
+					</tbody>
+				</table>
+			</div>
+			
+			<!-- Display: Welcome Page-->
+			<div id="display_welcome" class="starter-template" style="display:block;">
+				<h2> Comic Daemon</h2>
+				<h6>Updated: <span id="LastCrawlTime"></span></h6>
+				<br>
+				<br>
+				<h4>Click a comic to see the latest updates!</h4>
+				<br>
+				<br>
+				<h5>Contact: ComicDaemon@gmail.com</h5>
+				<br>
+				<br>
+				<h6 id="LastVisitTime"></h6>
+			</div>
+		</div>
+	
+	</div>
+
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="../../assets/js/vendor/jquery.min.js"><\/script>')</script>
+    <script src="./bootstrap/js/bootstrap.min.js"></script>
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <script src="./bootstrap/js/ie10-viewport-bug-workaround.js"></script>
+  
+  
+  
+    <!-- Menu Toggle Script -->
+    <script>
+    $("#menu-toggle").click(function(e) {
+        e.preventDefault();
+        $("#wrapper").toggleClass("toggled");
+    });
+    </script>
+	
+	<script>
+		// Requires CORS Settings on the Dynamic Data site.
+		let COMIC_BASE_PATH = "https://dynamicdata.azurewebsites.net/comics/";
+
+		function init() {
+			Options();
+			ShowMainPage();
+			LoadSession();
+			DisplayWelcome();
+			UpdateHideListFromUrl();
+
+			ShowComicList();
+			CacheComicData();
+		}
+
+		window.onload = init;
+	
+		function Options() {
+			// TestHooks
+		
+			// Casing is Sensitive.
+			let sessionOptions = getURLParameter("Session");
+			let comicDataLink = getURLParameter("DataLink");
+			
+			if (null != sessionOptions) {
+				sessionOptions = sessionOptions.toLowerCase();
+				if ("clear" == sessionOptions) {
+					ClearSession();
+				}
+			}
+			
+			if (null != comicDataLink) {
+				// .\comics\
+				COMIC_BASE_PATH = comicDataLink;
+			}
+			
+		}
+	
+		function UpdateHideListFromUrl() {
+			let show = getURLParameter("show");
+			let hide = getURLParameter("hide");
+			
+			// TODO: handle + for multiple parameters
+			// Should not be a hide tag list but rather a list of hidden comics based on tags.
+			/*
+				white list of allowed comics hides everythgin else by default.
+			
+				Following should be supported:
+				
+				show=ComicA+ComicB+ComicC
+					Should only show these comics
+				show=all	
+					shows all comics, default
+				
+				hide=completed
+				
+				exclude invalid tags
+			*/
+			
+			let hideTagList = SessionGetHideTagList();
+
+			if (null != show) {
+				show = show.toLowerCase();
+				if ("all" == show) {
+					hideTagList = [];
+					
+				} else {
+					ListRemoveValue(hideTagList, show);
+				}	
+			}
+			
+			if (null != hide) {
+				hide = hide.toLowerCase();
+				if ("all" == hide) {
+					let comicListData = GetComicMetadata();
+					hideTagList = comicListData["Tags"];
+				
+				} else {
+					hideTagList.push(hide);
+				}
+			}
+			
+			SessionSetHideTagList(hideTagList);
+		}
+	
+		function DisplayWelcome() {
+			Hide('display_comic');
+			Show('display_welcome');
+			DisplayLastVisitTime();
+		}
+	
+		function DisplayComic() {
+			Hide('display_welcome');
+			Show('display_comic');
+		}
+	
+		let ComicListData = undefined;
+	
+		function GetComicMetadata() {
+		
+			if (undefined == ComicListData) {
+				let comicListFile = COMIC_BASE_PATH + "Comics.Metadata.json";
+			
+				ComicListData = LoadFileJson(comicListFile);
+			}
+			
+			return ComicListData;
+		}
+	
+		function CacheComicData() {
+			// Asynchronously request comic data so it is in the cache.
+			
+			comicMetadata = GetComicMetadata();
+			
+			let comics = comicMetadata['Comics'];
+			
+			let i;
+			for (i = 0; i < comics.length; i++) {
+				let comic = comics[i];
+				let comicFilename = comic['MetadataFileName'];
+				
+				let comicFile = COMIC_BASE_PATH + comicFilename;
+				CacheFile(comicFile);
+			}
+		}
+
+		function ShowMainPage() {
+			let comicMetadata = GetComicMetadata();
+		
+			let lastCrawlTime = comicMetadata['LastCrawlTime'];
+			document.getElementById('LastCrawlTime').innerHTML = lastCrawlTime;
+		}
+		
+		// Cache ComicList so it does not need to be regenerated.
+		let LoadedComicList = false;
+	
+		function ShowComicList() {
+
+			if (!LoadedComicList) {
+			
+				let comicMetadata = GetComicMetadata();
+				
+				let comicList = LoadComicList(comicMetadata);
+				
+				document.getElementById('comic_list').innerHTML = comicList;
+				LoadedComicList = true;
+			}
+		}
+		
+		// Create the HTML side panel list of comics.
+		function LoadComicList(comicMetadata) {
+		
+			let comics = comicMetadata['Comics'];
+			
+			// Write out the comic list.
+			let comicList = "";
+			comicList = comicList +"<li class='sidebar-brand'> Comics </li>";
+			
+			for (i = 0; i < comics.length; i++) {
+				let comic = comics[i];
+				let comicTitle = comic['ComicTitle'];
+				let comicTags = comic['Tags'];
+				let comicFileName = comic['MetadataFileName'];
+				let comicAlias = GetComicAliasFromFilename(comicFileName);
+				let comicUnreadCount = FormatUnreadCount(GetUnreadCount(comicAlias));
+								
+				// Do not show comics that contain any hidden tags.
+				let HiddenTags = SessionGetHideTagList();
+				if (!ListContainsAny(comicTags, HiddenTags))
+				{
+					// TODO: use with Session instead of tags to form favorites
+					if (ListContainsValue(comicTags, STAR_TAG)){
+						comicTitle = comicTitle + "<span style='color:#9c0909;'>*</span>";
+					}
+					
+					comicList = comicList 
+					+'<li><a' + ' '
+					+ 'style="cursor: pointer;"' + ' '
+					+ 'onclick="LoadComic(' + "'" + comicFileName +"'" +');" >' 
+					+ comicTitle 
+					+ ' '
+					+'<span class="badge" style="text-indent: 0px;" id="' + ConstructComicUnreadId(comicAlias) + '">' + comicUnreadCount + '</span>'
+					+ '</a></li>';
+				}
+			}
+			
+			return comicList;
+		}
+	
+		function FindComicMetadata(comicAlias){
+			let comicMetadata = GetComicMetadata();
+			let searchComicFilename = GetComicFilenameFromAlias(comicAlias);
+			
+			let comics = comicMetadata['Comics'];
+			
+			let i;
+			for (i = 0; i < comics.length; i++) {
+				let comic = comics[i];
+				let comicFilename = comic['MetadataFileName'];
+				
+				if (searchComicFilename == comicFilename) {
+					return comic;
+				}
+			}
+			
+			return undefined;
+		}
+	
+		let LoadingComic = false;
+		function LoadComic(comicFileName){
+			if (LoadingComic) {
+				return;
+			}
+			LoadingComic = true;
+			DisplayComic();
+			
+			
+			
+			// Format Comic page based off of static server sider Json file.
+			
+			let comicFile = COMIC_BASE_PATH + comicFileName;
+			
+			let comicData = LoadFileJson(comicFile);
+
+			let comicAlias = GetComicAliasFromFilename(comicFileName);
+			
+			let comicMetadata = FindComicMetadata(comicAlias);
+			
+			// Comic Metadata properties.
+			let comicTitle = comicMetadata['ComicTitle'];
+			let lastUpdateTime = comicMetadata['LastUpdateDate'];
+			
+			document.getElementById('comic_title').innerHTML = comicTitle;
+			document.getElementById('comic_updatetime').innerHTML = lastUpdateTime;
+			
+			let comicPages = comicData['Pages'];
+			let i = 0;
+			let comicPageTableText = "";
+			
+			for (i = 0; i < comicPages.length; i++) {
+				let page = comicPages[i];
+				
+				let sequenceNumber = page['SequenceNumber'];
+				let pageLink = page['PageLink'];
+				let pageTitle = page['TitleText'];
+				
+				let style = "";
+				
+				if ( "" == pageTitle || undefined == pageTitle) {
+					pageTitle = sequenceNumber;
+				}
+				
+				comicPageTableText = comicPageTableText + "<tr><td>" 
+				+ '<a href="' + pageLink + '"' + " "
+				+ 'id="' + ConstructComicLinkId(comicAlias, sequenceNumber) + '"' + " "
+				+ 'target="_blank"' + " "
+				+ 'onclick="ComicLinkClicked(' + "'" + comicAlias + "'" +"," + String(sequenceNumber) +  ');"' + " "
+				+'>'
+				+ pageTitle
+				+ "</a></td></tr>";
+			}
+			document.getElementById('comic_pages').innerHTML = comicPageTableText;
+			
+			let lastComicNumber = SessionGetLastComicNumber(comicAlias);
+			ToggleLastComicStyleOn(comicAlias, lastComicNumber);
+			LoadingComic = false;
+		}
+		
+		function ConstructComicLinkId(comicAlias, sequenceNumber) {
+			return comicAlias + '_' + String(sequenceNumber);
+		}
+		
+		function ConstructComicUnreadId(comicAlias) {
+			return comicAlias + '_unread';
+		}
+		
+		function GetComicAliasFromFilename(comicFileName) {
+			return comicFileName.split(".Metadata.json",1)[0];
+		}
+		
+		function GetComicFilenameFromAlias(comicAlias) {
+			return comicAlias + ".Metadata.json";
+		}
+		
+		function GetUnreadCount(comicAlias) {
+			let comicMetadata = FindComicMetadata(comicAlias);
+			let latestComicNumber = comicMetadata["LastComicNumber"];
+			let lastReadComicNumber = SessionGetLastComicNumber(comicAlias);
+			let newComicCount = latestComicNumber - lastReadComicNumber;
+
+			return newComicCount;
+		}
+		
+		function SetUnreadCount(comicAlias) {
+			let unreadId = ConstructComicUnreadId(comicAlias);
+			let unreadElement = document.getElementById(unreadId);
+			let unreadCount = GetUnreadCount(comicAlias);
+			let displayUnreadCount = FormatUnreadCount(unreadCount);
+			unreadElement.innerHTML = displayUnreadCount;
+		}
+		
+		function FormatUnreadCount(comicUnreadCount) {
+			let stringComicUnreadCount = undefined;
+			
+			if (0 == comicUnreadCount) {
+				stringComicUnreadCount = "";
+				
+			} else if ( 0 < comicUnreadCount) {
+				stringComicUnreadCount = String(comicUnreadCount);
+	
+			} else if ( 0 > comicUnreadCount) {
+				// Happens if a reindexing occurs on a site.
+				stringComicUnreadCount = "?";
+			}
+			return stringComicUnreadCount;
+		}
+		
+		function ToggleLastComicStyleOn(comicAlias, sequenceNumber) {
+			// Style choice to not to show one for 0.
+			if (0 != sequenceNumber) {
+				document.getElementById(ConstructComicLinkId(comicAlias, sequenceNumber)).style.color = "red";
+			}
+		}
+		
+		function ToggleLastComicStyleClear(comicAlias, sequenceNumber) {
+			try {
+				document.getElementById(ConstructComicLinkId(comicAlias, sequenceNumber)).style.color = "";
+			} catch (err) {
+				console.log(err.message);
+			}
+		}
+		
+		function ComicLinkClicked(comicAlias, sequenceNumber){
+			let lastComicNumber = SessionGetLastComicNumber(comicAlias);
+			ToggleLastComicStyleClear(comicAlias, lastComicNumber);
+		
+			SessionSetLastComicNumber(comicAlias, sequenceNumber);
+			ToggleLastComicStyleOn(comicAlias, sequenceNumber);
+			SetUnreadCount(comicAlias);
+		}
+		
+		function DisplayLastVisitTime() {
+			let displayText = "Welcome!";
+		
+			let lastVisitTime = SessionGetLastVisitTime();
+			if (lastVisitTime != undefined) {
+				let lastVisitTime = Session["LastVisitTime"];
+				
+				let millisecondsSinceLastVisit = Date.now() - lastVisitTime;
+				
+				// Constants for math.
+				let SECOND_MILLISECONDS = 1000;
+				let MINUTE_MILLISECONDS = SECOND_MILLISECONDS * 60;
+				let HOUR_MILLISECONDS = MINUTE_MILLISECONDS * 60;
+				let DAY_MILLISECONDS = HOUR_MILLISECONDS * 24;
+				
+				// Since last visit.
+				let days = Math.floor( millisecondsSinceLastVisit / DAY_MILLISECONDS);
+				let hours = Math.floor( (millisecondsSinceLastVisit % DAY_MILLISECONDS) / HOUR_MILLISECONDS);
+				let minutes = Math.floor( (millisecondsSinceLastVisit % HOUR_MILLISECONDS) / MINUTE_MILLISECONDS);
+				let seconds = Math.floor( (millisecondsSinceLastVisit % MINUTE_MILLISECONDS) / SECOND_MILLISECONDS);
+				
+				let greatestUnitCount = "";
+				let greatestUnitName = "" 
+				
+				if (0 != days){
+					greatestUnitCount = days; 
+					greatestUnitName = "Day";
+				
+				} else if (0 != hours){
+					greatestUnitCount = hours;
+					greatestUnitName = "Hour";
+				
+				} else if (0 != minutes){
+					greatestUnitCount = minutes;
+					greatestUnitName = "Minute";
+				
+				} else if (0 != seconds){
+					greatestUnitCount = seconds;
+					greatestUnitName = "Second";
+				
+				} else {
+					greatestUnitCount = millisecondsSinceLastVisit;
+					greatestUnitName = "Milisecond";
+				}			
+				
+				// Proper usage of plural.
+				if (greatestUnitCount > 1) {
+					greatestUnitName = greatestUnitName + "s";
+				}
+				
+				displayText =  "Last visit " + String(greatestUnitCount) + " " + greatestUnitName + " ago.";
+			
+			}
+			
+			document.getElementById("LastVisitTime").innerHTML = displayText;
+			
+			SessionSetLastVisitTime();
+		}
+		
+	</script>
+
+</body></html>
