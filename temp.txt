@@ -1,0 +1,60 @@
+
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+        <div class="navbar-header">
+          <a class="navbar-brand" href="#Comics" id="menu-toggle" onclick="ShowComicList();" >Comic Daemon</a>
+        </div>
+    </nav>
+	
+	<div id="wrapper">
+        <!-- Sidebar -->
+        <div id="sidebar-wrapper">
+            <ul id="comic_list" class="sidebar-nav">
+                <li class="sidebar-brand">
+					Comics
+                </li>
+				<!-- The Comics are dynamically loaded. Adding a comic is a data change. -->
+				<!-- 				
+				<li>
+                    <a onclick="LoadComic('test');" >Test</a>
+                </li> 
+				-->
+
+            </ul>
+        </div>
+	
+		<div class="container">
+		
+			<!-- Display: Comic Page -->
+			<div id="display_comic" class="" style="display:none;">
+				<h2 id="comic_title"> Template Comic Title</h2>
+				<!-- Latest Comics-->
+				<h6>Updated: <span id="comic_updatetime">Template Update Time</span></h6>
+				<br>
+				<table class="table table-hover">
+					<tbody id="comic_pages">
+					  <tr>
+						<td>0 <a href="pagelink" target="_blank">Page Title</a></td>
+					  </tr>
+					</tbody>
+				</table>
+			</div>
+			
+			<!-- Display: Welcome Page-->
+			<div id="display_welcome" class="" style="display:block;">
+				<h2> Comic Daemon</h2>
+				<h6>Updated: <span id="LastCrawlTime"></span></h6>
+				<br>
+				<br>
+				<h4>Click a comic to see the latest updates!</h4>
+				<br>
+				<br>
+				<h5>Contact: ComicDaemon@gmail.com</h5>
+				<br>
+				<br>
+				<h6 id="LastVisitTime"></h6>
+			</div>
+		</div>
+	
+	</div>
+
+    <script src="./page.js"/>

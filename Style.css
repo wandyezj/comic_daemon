@@ -1,0 +1,69 @@
+* {box-sizing: border-box;}
+
+/* remove white margin on the border of the site*/
+html, body {
+    margin: 0;
+    border: none;
+    padding: 0;
+    overflow: auto;
+    height: 100%;
+}
+
+#header {
+    overflow: hidden;
+    background-color: #333333;
+    margin: 0;
+    border: none;
+    padding: 1em;
+}
+
+#title {
+    color: white;
+    font-size: large;
+    font-family: 'Helvetica';
+
+}
+
+#content {
+    overflow: auto;
+    margin: auto;
+    width:100%;
+    height: 100%;
+}
+
+#column-body-nav {
+    width: 20%;
+    height: 100%;
+    background-color: aquamarine;
+}
+
+#column-body-content {
+    width: 80%;
+    height: 100%;
+    background-color: red;
+}
+
+
+.comic-list {
+    background-color: black;
+}
+
+ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    width: 200px;
+}
+
+li a {
+    display: block;
+    color: white;
+    padding: 8px 16px;
+    text-decoration: none;
+}
+
+/* Change the link color on hover */
+li a:hover {
+    background-color: #555;
+    color: white;
+}
